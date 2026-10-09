@@ -1,0 +1,25 @@
+--- a/videoMode6.def.h	2026-10-09 20:24:15.660844177 +0000
++++ b/videoMode6.def.h	2026-10-09 21:25:45.655290595 +0000
+@@ -32,11 +32,21 @@
+ #define VMODE_FUNC sub_video_mode6
+ 
+ 
++//M6_HIRES=1 (default, as before): 288x224, black/white, colour per scanline through mycallback (see VectorDemo)
++//M6_HIRES=0: 240x224, honours SetBackgroundColor()/SetForegroundColor()
++#ifndef M6_HIRES
++	#define M6_HIRES 1
++#endif
++
+ #define TILE_HEIGHT 8
+ #define TILE_WIDTH 8
++#if M6_HIRES
+ #define VRAM_TILES_H 36
++#else
++#define VRAM_TILES_H 30
++#endif
+ #define VRAM_TILES_V 28		
+-#define SCREEN_TILES_H 36 
++#define SCREEN_TILES_H VRAM_TILES_H 
+ #define SCREEN_TILES_V 28
+ 
+ #ifndef FIRST_RENDER_LINE

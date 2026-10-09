@@ -1,0 +1,34 @@
+--- a/videoMode6.s	2026-10-09 20:24:15.574110240 +0000
++++ b/videoMode6.s	2026-10-09 21:25:45.655150939 +0000
+@@ -90,7 +90,11 @@
+ 	WAIT r19,213 - AUDIO_OUT_HSYNC_CYCLES
+ 
+ 	;***draw line***
+-	call render_tile_line_hires ;render_tile_line
++#if M6_HIRES
++	call render_tile_line_hires ;288px, black/white, per-line colour via mycallback/DDRC
++#else
++	call render_tile_line ;240px, honours SetBackgroundColor()/SetForegroundColor()
++#endif
+ 	
+ 	WAIT r19,52-5
+ 
+@@ -440,8 +444,8 @@
+  */
+ ClearBuffer:
+ 
+-	ldi XL,lo8(vram+(36*6))
+-	ldi XH,hi8(vram+(36*6))
++	ldi XL,lo8(vram+(VRAM_TILES_H*6))
++	ldi XH,hi8(vram+(VRAM_TILES_H*6))
+ 
+ .rept SCREEN_TILES_H*SCREEN_TILES_V
+ 	st X+,r1	
+@@ -935,6 +939,7 @@
+ 
+ 
+ .global mycallback
++.weak bgcolors ;defined by applications that install mycallback (e.g. VectorDemo); optional otherwise
+ ;C-callable
+ ;must take exactly 32 cycles including the ret
+ mycallback:

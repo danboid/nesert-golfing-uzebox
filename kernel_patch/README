@@ -1,0 +1,19 @@
+Opt-in 240px mode for the kernel's video mode 6.
+
+You could run commands such as:
+
+cd ../../../kernel/videoMode6
+patch -p1 < ../../demos/uzebox-nesert/kernel_patch/videoMode6.s.patch
+patch -p1 < ../../demos/uzebox-nesert/kernel_patch/videoMode6.def.h.patch
+
+To apply these patches.
+
+New build option  -DM6_HIRES=<1|0>:
+  1 (DEFAULT - the kernel behaves exactly as before, so VectorDemo and other mode 6 users are unaffected):
+      288x224, black/white pixels, colour per scanline from mycallback()/DDRC (application-defined bgcolors[]).
+  0 : 240x224 using the renderer that is already in videoMode6.s (render_tile_line); honours
+      SetBackgroundColor()/SetForegroundColor(). Both renderers take 1440 cycles per line.
+
+Other changes: mycallback is kept (a weak reference to bgcolors lets applications that don't define it link);
+ClearBuffer's hard-coded 36 becomes VRAM_TILES_H (identical value when M6_HIRES=1).
+The patches are CRLF, like the kernel files. Verified to apply to the files in the kernel zip; assembly not run.

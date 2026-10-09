@@ -1,0 +1,6 @@
+# Host-side test build (gcc). Not used for the Uzebox target.
+CFLAGS ?= -O1 -g -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-unused-parameter
+test_host: host/host_main.c host/plat_host.c src/render.c src/sfx.c src/game.c src/*.h
+	gcc $(CFLAGS) $(EXTRA) -DLAST_HOLE_TEST=$(LAST) -o $@ host/host_main.c host/plat_host.c src/render.c src/sfx.c
+clean:
+	rm -f test_host
