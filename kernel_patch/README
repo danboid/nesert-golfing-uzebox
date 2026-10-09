@@ -17,3 +17,30 @@ New build option  -DM6_HIRES=<1|0>:
 Other changes: mycallback is kept (a weak reference to bgcolors lets applications that don't define it link);
 ClearBuffer's hard-coded 36 becomes VRAM_TILES_H (identical value when M6_HIRES=1).
 The patches are CRLF, like the kernel files. Verified to apply to the files in the kernel zip; assembly not run.
+
+## Mode 6 kernel: what the provided source says, and the patch
+
+Read from `videoMode6.s`, `videoMode6.h`, `videoMode6.def.h`:
+
+* **Two renderers are in the file.** The one currently called (`render_tile_line_hires`) draws **288 px (36 columns), black
+  and white only**: it outputs `0x00`/`0xFF` and never uses `bg_color`/`fg_color`, so `SetBackgroundColor()` /
+  `SetForegroundColor()` do nothing visible. Its only colour hook, `mycallback`, writes a per-line foreground into `DDRC`
+  from a `bgcolors[]` array that the **application must define** (224 B of RAM; the kernel's `VectorDemo` defines it and shows "288X224 RESOLUTION"), with the background fixed black. That is the kernel's intended hires design: one colour per scanline, on black.
+  The original renderer (`render_tile_line`) is still there: **240 px (30 columns), real foreground and background
+  colours**, 6 cycles/pixel. Both take 1440 cycles per line, so the swap is timing-neutral.
+* **`kernel_patch/`** adds an opt-in `M6_HIRES` build option. The default (`1`) leaves the kernel exactly as it was (VectorDemo and other
+  mode 6 programs are unaffected). `-DM6_HIRES=0` calls the 240 px renderer already in the file and sets 30 columns (168 B less RAM).
+  `mycallback` is kept; a weak reference to `bgcolors` lets programs that don't define it link. This port builds with `-DM6_HIRES=0`.
+  Unpatched/`M6_HIRES=1` builds of this port (`-DVRAM_STRIDE=36`) are black/white only.
+  (An earlier version of this patch hard-switched the kernel and disabled `mycallback`, which broke linking VectorDemo
+  (`undefined reference to 'mycallback'`). That was a bad design; restore the original files before applying this one.)
+* Tile format: `ramTiles` is `RAM_TILES_COUNT`×8 bytes, one byte per line, bit 7 = leftmost pixel, set bit = foreground,
+  `vram` index 0 = blank (`ramTiles[0..7]` must stay zero). This matches what `render.c` writes.
+* The kernel's own drawing: `SetPixel2` ORs into the tile its VRAM cell already points at and only allocates
+  (from `nextFreeRamTile`, starting at 1) when the cell is 0, so it cannot copy-on-write over shared base tiles; `ClearBuffer`
+  starts 6 rows into `vram` and writes 36×28 bytes (6 rows past the end). The port uses neither, and draws its own
+  line runs. `videoMode6.h` declares `SetRamTileBaseDrawingIndex`, but the `.s` exports `SetUserRamTileIndex` instead.
+* The hsync hook (`SetHsyncCallback`) is called **every line** and must take exactly 32 cycles including the `ret`, so it is
+  assembly only. A per-line text colour therefore isn't implemented: text uses the ground colour. (Possible later as a
+  small cycle-counted asm routine writing `fg_color`.)
+* Kernel options: `RAM_TILES_COUNT` must equal `RAMTILES` in `src/nesert.h` (checked by `#error` in `plat_uzebox.c`).
