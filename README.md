@@ -3,13 +3,19 @@
 This is port of **NESert Golfing** by Brad Smith (2019–2022), itself derived from *Desert Golfing* by
 Justin Smith (2014), to the Uzebox using a modified **video mode 6** (monochrome 1bpp RAM-tile bitmap).
 
-This port was magicked here under the supervision of Dan MacDonald, Based on the source code downloaded from: <https://github.com/bbbradsmith/NESertGolfing> (CC BY 4.0).
+This port was magicked here under the supervision of Dan MacDonald, Based on the source code downloaded from:
 
-Building this game requires patching video mode 6's kernel source as described in the **Building** section below.
+<https://github.com/bbbradsmith/NESertGolfing> (CC BY 4.0).
+
+## Controls
+
+Hold down the A button then use the dpad to set up your shots angle and strength. Let go of A to strike the ball.
 
 ![host simulation](docs/host_simulation_screens.png)
 
 ## Building
+
+Building this game requires patching video mode 6's kernel source as described in the **Building** section below.
 
 Host tests (gcc + Python/Pillow): `./run_tests.sh` — plays 120 holes (and the forced ocean hole) with a bot that
 `fork()`s the game, tries swings headless, and plays the best. Screenshots land in `test_out/` as PPM.
