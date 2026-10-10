@@ -68,6 +68,8 @@ typedef int32_t  sint32;
 #define PAD_DOWN   0x04
 #define PAD_LEFT   0x02
 #define PAD_RIGHT  0x01
+#define MOUSE_L    0x40   // mouse buttons, same bit layout as the NES source's mouse1 byte
+#define MOUSE_R    0x80
 
 // game constants (from dgolf.c)
 #define GLOBAL_FLOOR 222
@@ -93,6 +95,9 @@ typedef int32_t  sint32;
 void     plat_init(void);
 void     plat_vsync(void);                 // wait for vertical blank (60 Hz)
 uint8    plat_pad(void);                   // PAD_* bits
+uint8    plat_mouse_present(void);         // 1 while a SNES mouse is plugged in and reporting
+uint8    plat_mouse(sint8 *dx, sint8 *dy); // SNES mouse: MOUSE_* bits (0 if none), motion since the last call
+                                           // (two's complement, clamped to +-127; dx > 0 = right, dy > 0 = down)
 uint16   plat_entropy(void);               // anything that varies between power-ups
 void     plat_colors(uint8 bg, uint8 fg, uint8 fg_band, uint8 band_y0, uint8 band_y1);
 void     plat_note(uint8 channel, uint8 patch, uint8 note, uint8 vol);   // TriggerNote(); vol 0 = note off

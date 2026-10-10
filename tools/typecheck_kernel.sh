@@ -25,10 +25,18 @@ extern volatile uint16_t TCNT1;
 #define PORTB5 5
 #define PORTB6 6
 #define PORTB7 7
+#define _BV(b) (1 << (b))
+#define PA0 0
+#define PA1 1
+#define PA2 2
+#define PA3 3
 extern volatile uint8_t PORTA, PORTB, PORTC, PORTD, DDRA, DDRB, DDRC, DDRD, PINA, PINB, PINC, PIND;
 #define _SFR_IO_ADDR(x) 0
 #define _SFR_MEM_ADDR(x) 0
 EOF2
 printf '#pragma once\n#include <stdint.h>\n#define PROGMEM\n#define pgm_read_byte(p) (*(const uint8_t*)(p))\n#define pgm_read_word(p) (*(const uint16_t*)(p))\n#define pgm_read_ptr(p) (*(void* const*)(p))\n' > "$S/avr/pgmspace.h"
 printf '#pragma once\n' > "$S/avr/interrupt.h"
-gcc -fsyntax-only -std=gnu99 -Wall -Wextra -Wno-unused-parameter -DVIDEO_MODE=6 -DM6_HIRES=0 -DRAM_TILES_COUNT=128 -DSOUND_MIXER=1 -DINTRO_LOGO=0 -I"$S" -I"$K" -I"$HERE/src" "$HERE/src/plat_uzebox.c" && echo "plat_uzebox.c type-checks against $K"
+mkdir -p "$S/util"
+printf '#pragma once\nstatic inline void _delay_us(double us) { (void)us; }\n' > "$S/util/delay.h"
+printf '#pragma once\n#define ATOMIC_RESTORESTATE 0\n#define ATOMIC_BLOCK(t) for (int atomic_once_ = 1; atomic_once_; atomic_once_ = 0)\n' > "$S/util/atomic.h"
+gcc -fsyntax-only -std=gnu99 -Wall -Wextra -Wno-unused-parameter -DVIDEO_MODE=6 -DM6_HIRES=0 -DRAM_TILES_COUNT=128 -DSOUND_MIXER=1 -DINTRO_LOGO=0 -DCONTROLLERS_VSYNC_READ=0 -DSNES_MOUSE=0 -I"$S" -I"$K" -I"$HERE/src" "$HERE/src/plat_uzebox.c" && echo "plat_uzebox.c type-checks against $K"

@@ -16,7 +16,8 @@ INFO=../gameinfo.properties
 ## RAM_TILES_COUNT must equal RAMTILES in ../src/nesert.h (checked at compile time by plat_uzebox.c)
 KERNEL_DIR = ../../../kernel
 ## M6_HIRES=0 selects the 240px colour renderer (needs kernel_patch/ applied; the kernel default, M6_HIRES=1, is unchanged)
-KERNEL_OPTIONS = -DVIDEO_MODE=6 -DINTRO_LOGO=0 -DRAM_TILES_COUNT=128 -DSOUND_MIXER=1 -DM6_HIRES=0
+## The port reads the controllers itself (Hyperkin-safe timing, see plat_uzebox.c): kernel reading and mouse code off
+KERNEL_OPTIONS = -DVIDEO_MODE=6 -DINTRO_LOGO=0 -DRAM_TILES_COUNT=128 -DSOUND_MIXER=1 -DM6_HIRES=0 -DCONTROLLERS_VSYNC_READ=0 -DSNES_MOUSE=0
 
 
 ## Options common to compile, link and assembly rules
@@ -92,6 +93,9 @@ sfx.o: ../src/sfx.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 ##Link
+## rebuild everything when this Makefile (e.g. KERNEL_OPTIONS) changes; make does not track flags by itself
+$(OBJECTS): Makefile
+
 $(TARGET): $(OBJECTS)
 	 $(CC) $(LDFLAGS) $(OBJECTS) $(LINKONLYOBJECTS) $(LIBDIRS) $(LIBS) -o $(TARGET)
 

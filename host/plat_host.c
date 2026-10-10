@@ -18,6 +18,9 @@ unsigned long sound_events;
 void   plat_init(void) {}
 void   plat_vsync(void) { ++host_frames; if (host_frame_fn) host_frame_fn(); }
 uint8  plat_pad(void) { return host_pad_fn ? host_pad_fn() : 0; }
+uint8 (*host_mouse_fn)(sint8 *dx, sint8 *dy);     // optional; no mouse when unset
+uint8  plat_mouse_present(void) { return host_mouse_fn ? 1 : 0; }
+uint8  plat_mouse(sint8 *dx, sint8 *dy) { *dx = *dy = 0; return host_mouse_fn ? host_mouse_fn(dx, dy) : 0; }
 uint16 plat_entropy(void) { return 0x1234; }
 void   plat_colors(uint8 bg, uint8 fg, uint8 fgb, uint8 y0, uint8 y1) { c_bg = bg; c_fg = fg; c_fgb = fgb; c_y0 = y0; c_y1 = y1; }
 void   plat_note(uint8 ch, uint8 patch, uint8 note, uint8 vol) { (void)ch; (void)patch; (void)note; if (vol) ++sound_events; }

@@ -7,7 +7,8 @@
 //   ppu_*          -> scene_* flags in render.c
 //   sound_play()   -> sfx_play()
 //   palette[]      -> col_bg / col_fg / col_text (monochrome mode: sky / ground / text)
-// Not ported in this version: Tournament Edition, NES mouse, the help screen slide-in.
+// Not ported in this version: Tournament Edition, the help screen slide-in.
+// The SNES mouse is supported as in the NES game (plat_mouse(); on the Uzebox it may be in either port).
 //
 #include "nesert.h"
 #include "data_slopes.h"
@@ -37,6 +38,8 @@ static sint16 ux;
 static uint16 tx, ty;
 static sint16 tsx, tsy;
 static uint8  gamepad, gamepad_last, gamepad_new;
+static uint8  mouse1, mouse_last, mouse_new, mouse_steady;   // mouse1 = MOUSE_* buttons
+static sint8  mouse2, mouse3, mouse_sx, mouse_sy;            // mouse2 = y motion, mouse3 = x motion (NES names)
 
 static uint32 ball_x, ball_y;
 static sint32 ball_vx, ball_vy;
@@ -125,6 +128,7 @@ static uint8 blend25(uint8 a, uint8 b) { return blend_w(a, b, 3); }   // 75% a, 
 static void input_poll(void)
 {
 	gamepad = plat_pad();
+	mouse1 = plat_mouse(&mouse3, &mouse2);
 	if ((gamepad & (PAD_A | PAD_B | PAD_SELECT | PAD_START)) == (PAD_A | PAD_B | PAD_SELECT | PAD_START))
 		plat_soft_reset();
 }
@@ -133,7 +137,27 @@ static void new_poll(void)
 {
 	input_poll();
 	gamepad_new = gamepad & (gamepad ^ gamepad_last);
+	mouse_new = mouse1 & (mouse1 ^ mouse_last);
 	gamepad_last = gamepad;
+	mouse_last = mouse1;
+
+	// filter out new mouse motions until it's been stationary for a few frames
+	#define MOUSE_STEADY_TIME 24
+	#define MOUSE_STEADY_MOVE 12
+	mouse_sx = 0;
+	mouse_sy = 0;
+	if (mouse_steady) {
+		--mouse_steady;
+	} else {
+		if (mouse3 >= MOUSE_STEADY_MOVE || mouse3 <= -MOUSE_STEADY_MOVE) {
+			mouse_sx = mouse3;
+			mouse_steady = MOUSE_STEADY_TIME;
+		}
+		if (mouse2 >= MOUSE_STEADY_MOVE || mouse2 <= -MOUSE_STEADY_MOVE) {
+			mouse_sy = mouse2;
+			mouse_steady = MOUSE_STEADY_TIME;
+		}
+	}
 }
 
 static void sound_play(uint8 id) { sfx_play(id); }
@@ -431,8 +455,12 @@ static const char help_text[] PROGMEM =
 	"  release to stroke.\n"
 	"  Hold B for fine control.\n"
 	"\n"
-	"UZEBOX PORT, MODE 6\n"
-	"  (mouse not supported)\n"
+	"MOUSE CONTROL:\n"
+	"  Hold left button to begin\n"
+	"  swing, drag to aim,\n"
+	"  release to stroke.\n"
+	"  Hold right button for\n"
+	"  fine control.\n"
 	"\n"
 	" NESert Golfing was derived\n"
 	"   from the original game\n"
@@ -455,15 +483,16 @@ static void scene_set(uint8 mode, const char *text, uint8 c, uint8 r, uint8 y0, 
 }
 
 static const char splash_text[] PROGMEM = "       Press START";
+static const char splash_text_mouse[] PROGMEM = "Press START or click";   // while a mouse is plugged in (cols 8-27, clear of the right edge)
 
 // Menu page (terrain + menu text).
 static void title_scene(void) { scene_set(SCENE_TITLE, title_text, 5, 15, 0, 168); }
 
 // Splash page: logo only. With few ramtiles the logo cannot share the screen with the menu text
 // and terrain, so it gets a page of its own over a flat ground strip.
-static void splash_scene(void)
+static void splash_scene(uint8 mouse)
 {
-	scene_set(SCENE_TITLE, splash_text, 8, 14, 0, 192 - Y_OFF);
+	scene_set(SCENE_TITLE, mouse ? splash_text_mouse : splash_text, 8, 14, 0, 192 - Y_OFF);
 	scene_logo = 1; scene_flat = 1;
 }
 
@@ -476,7 +505,7 @@ static void help(void)
 	for (;;) {
 		frame();
 		new_poll();
-		if (gamepad_new) break;
+		if (gamepad_new || mouse_new) break;
 	}
 	title_scene();
 }
@@ -531,16 +560,28 @@ static void title(void)
 	palette_generate(pal_sky, pal_floor, pal_text);
 	title_menu = 0;
 	gamepad_last = gamepad;
+	mouse_last = mouse1;
+	mouse_steady = 0;
+	mouse_sx = 0;
+	mouse_sy = 0;
 #if TITLE_SPLIT
-	splash_scene();
-	sprite_begin(); sprite_end();
-	for (;;) {                                  // page 1: logo
-		frame();
-		new_poll();
-		prng();
-		if (gamepad_new & (PAD_START | PAD_A | PAD_B | PAD_SELECT | PAD_DOWN)) break;
+	{
+		// Port addition: START or a left click on the logo page starts a 1-player game straight away (the NES title
+		// has "Play" preselected, so START starts there too); A, B, SELECT, DOWN or a right click open the menu page.
+		uint8 quick = 0, mouse_shown = plat_mouse_present();
+		splash_scene(mouse_shown);
+		sprite_begin(); sprite_end();
+		for (;;) {                              // page 1: logo
+			frame();
+			new_poll();
+			prng();
+			if ((gamepad_new & PAD_START) || (mouse_new & MOUSE_L)) { quick = 1; break; }
+			if ((gamepad_new & (PAD_A | PAD_B | PAD_SELECT | PAD_DOWN)) || (mouse_new & MOUSE_R)) break;
+			if (plat_mouse_present() != mouse_shown) { mouse_shown ^= 1; splash_scene(mouse_shown); }
+		}
+		title_scene();
+		if (quick) { sprite_begin(); sprite_end(); frame(); goto title_done; }
 	}
-	title_scene();
 #else
 	title_scene();
 	scene_logo = 1;
@@ -558,20 +599,25 @@ static void title(void)
 		sprite_end();
 		frame();
 		new_poll();
-		if (gamepad_new & PAD_START) {
+		if ((mouse_new & MOUSE_L) || (gamepad_new & PAD_START)) {          // START or LMB starts game unless help is selected
 			if (title_menu != 2) break; else help();
+		} else if (mouse_new & MOUSE_R) {                                   // RMB cycles players
+			players = (players & 3) + 1;
 		} else if ((title_menu != 1) && (gamepad_new & (PAD_A | PAD_B))) {
 			if (title_menu != 2) break; else help();
-		} else if (gamepad_new & (PAD_DOWN | PAD_SELECT)) {
+		} else if ((gamepad_new & (PAD_DOWN | PAD_SELECT)) || mouse_sy > 0) {
 			++title_menu; if (title_menu > 2) title_menu = 0;
-		} else if (gamepad_new & PAD_UP) {
+		} else if ((gamepad_new & PAD_UP) || mouse_sy < 0) {
 			--title_menu; if (title_menu > 2) title_menu = 2;
 		} else if (title_menu == 1) {
-			if (gamepad_new & (PAD_A | PAD_RIGHT)) players = (players & 3) + 1;
-			else if (gamepad_new & PAD_LEFT)        players = ((players + 2) & 3) + 1;
+			if ((gamepad_new & (PAD_A | PAD_RIGHT)) || mouse_sx > 0) players = (players & 3) + 1;
+			else if ((gamepad_new & PAD_LEFT) || mouse_sx < 0)        players = ((players + 2) & 3) + 1;
 		}
 		prng();     // build up entropy
 	}
+#if TITLE_SPLIT
+title_done:
+#endif
 	seed ^= (uint32)plat_entropy() << 4;       // extra hardware entropy at the moment of starting
 	if ((seed & 0xFFFFFFUL) == 0) seed = 1;
 	seed &= 0xFFFFFFUL;
@@ -786,6 +832,8 @@ static void status_bar_fade_in(void)
 #define ROLLOUT 16
 #define PSWING_COARSE 32
 #define PSWING_FINE    1
+#define MSWING_COARSE  8
+#define MSWING_FINE    1
 #define OFFSCREEN_X ((uint32)SCR_W * 256UL)
 
 void hole_play(void)
@@ -877,7 +925,7 @@ void hole_play(void)
 			prng1();
 			hole_draw();
 			frame();
-		} while (!(gamepad & (PAD_B | PAD_A)));
+		} while (!(gamepad & (PAD_B | PAD_A)) && !(mouse1 & (MOUSE_L | MOUSE_R)));
 		dbg_state = 2;
 		swinging = 1;
 		swing_x = 0;
@@ -895,6 +943,13 @@ void hole_play(void)
 				if (gamepad & PAD_UP   ) swing_y -= PSWING_COARSE;
 				if (gamepad & PAD_DOWN ) swing_y += PSWING_COARSE;
 			}
+			if (mouse1 & MOUSE_R) {
+				swing_x += mouse3 * MSWING_FINE;
+				swing_y += mouse2 * MSWING_FINE;
+			} else {
+				swing_x += mouse3 * MSWING_COARSE;
+				swing_y += mouse2 * MSWING_COARSE;
+			}
 			if (swing_x >  SWING_MAX) swing_x =  SWING_MAX;
 			if (swing_x < -SWING_MAX) swing_x = -SWING_MAX;
 			if (swing_y >  SWING_MAX) swing_y =  SWING_MAX;
@@ -902,7 +957,7 @@ void hole_play(void)
 			prng1();
 			hole_draw();
 			frame();
-		} while (gamepad & (PAD_B | PAD_A));
+		} while ((gamepad & (PAD_B | PAD_A)) || (mouse1 & (MOUSE_L | MOUSE_R)));
 		swinging = 0;
 		if (swing_x < SWING_MIN && swing_x > -SWING_MIN && swing_y < SWING_MIN && swing_y > -SWING_MIN)
 			goto stroke_wait;

@@ -1,12 +1,10 @@
 Opt-in 240px mode for the kernel's video mode 6.
 
-You could run commands such as:
+To apply these patches run:
 
-cd ../../../kernel/videoMode6
-patch -p1 < ../../demos/uzebox-nesert/kernel_patch/videoMode6.s.patch
-patch -p1 < ../../demos/uzebox-nesert/kernel_patch/videoMode6.def.h.patch
-
-To apply these patches.
+  cd ../../../kernel/videoMode6
+  patch -p1 < ../../demos/uzebox-nesert/kernel_patch/videoMode6.s.patch
+  patch -p1 < ../../demos/uzebox-nesert/kernel_patch/videoMode6.def.h.patch
 
 New build option  -DM6_HIRES=<1|0>:
   1 (DEFAULT - the kernel behaves exactly as before, so VectorDemo and other mode 6 users are unaffected):
